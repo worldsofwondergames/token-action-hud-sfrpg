@@ -26,39 +26,66 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
             if (!this.actor) {
                 // Nothing selected, or several tokens: only the actions that do
                 // not belong to one actor make sense.
-                this.#buildCombatActions();
+                await this.#safely('utility', () => this.#buildCombatActions());
                 return;
             }
 
             switch (this.actor.type) {
                 case CHARACTER_TYPE:
-                    this.#buildAbilities();
-                    this.#buildSaves();
-                    this.#buildSkills();
-                    this.#buildWeapons(this.actor.items.filter(i => i.type === 'weapon'), {
-                        attacks: GROUP.weaponAttacks,
-                        damage: GROUP.weaponDamage
-                    });
-                    this.#buildInventory();
-                    this.#buildSpells();
-                    this.#buildFeats();
-                    this.#buildCharacterUtility();
+                    await this.#safely('abilities', () => this.#buildAbilities());
+                    await this.#safely('saves', () => this.#buildSaves());
+                    await this.#safely('skills', () => this.#buildSkills());
+                    await this.#safely('attack', () => this.#buildWeapons(
+                        this.actor.items.filter(i => i.type === 'weapon'),
+                        { attacks: GROUP.weaponAttacks, damage: GROUP.weaponDamage }
+                    ));
+                    await this.#safely('inventory', () => this.#buildInventory());
+                    await this.#safely('spells', () => this.#buildSpells());
+                    await this.#safely('feats', () => this.#buildFeats());
+                    await this.#safely('utility', () => this.#buildCharacterUtility());
                     break;
 
                 case MECH_TYPE:
-                    this.#buildWeapons(this.actor.items.filter(i => i.type === 'mechWeapon'), {
-                        attacks: GROUP.mechWeaponAttacks,
-                        damage: GROUP.mechWeaponDamage
-                    });
-                    this.#buildMechSystems();
-                    this.#buildMechActions();
-                    this.#buildMechUtility();
+                    await this.#safely('mech weapons', () => this.#buildWeapons(
+                        this.actor.items.filter(i => i.type === 'mechWeapon'),
+                        { attacks: GROUP.mechWeaponAttacks, damage: GROUP.mechWeaponDamage }
+                    ));
+                    await this.#safely('mech systems', () => this.#buildMechSystems());
+                    await this.#safely('mech actions', () => this.#buildMechActions());
+                    await this.#safely('utility', () => this.#buildMechUtility());
                     break;
 
                 default:
                     // npc2, drone, starship, vehicle and hazard are not supported
                     // yet. They build an empty HUD rather than an error.
                     break;
+            }
+        }
+
+        /**
+         * Run one section of the build, keeping any failure inside it.
+         *
+         * Core calls `buildSystemActions()` from inside a `Promise.all` with no
+         * error handling of its own, and `TokenActionHud#performUpdate()` sets
+         * `isUpdating` immediately before that call and clears it only after --
+         * there is no `try/finally`. An exception escaping from here therefore
+         * leaves the flag set, and every later update waits five seconds on it
+         * and then aborts. One bad item would silently disable the HUD for the
+         * rest of the session, for every actor, not just the one that broke.
+         * Losing a single group is by far the smaller failure.
+         *
+         * @private
+         */
+        async #safely(section, build) {
+            try {
+                await build();
+            } catch (error) {
+                console.error(`${MODULE.ID}: failed to build the ${section} actions`, error);
+                notifyOnce(
+                    `build:${section}`,
+                    `Token Action HUD Starfinder could not build the ${section} actions.`
+                    + ' See the browser console for details.'
+                );
             }
         }
 
@@ -357,9 +384,24 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
          * cannot list an action the actor would not recognise.
          */
         #buildMechActions() {
+            const { mechPPActions, mechSpecialActions, mechActionTypes } = CONFIG.SFRPG;
+
+            // These tables are published by the Starfinder system. Older versions
+            // keep them inside the mech sheet, where nothing outside it can read
+            // them, so there is no list to build from and no entry point to call.
+            if (!mechPPActions || !mechSpecialActions || !mechActionTypes) {
+                notifyOnce(
+                    'mechActionTables',
+                    'Token Action HUD Starfinder: this version of the Starfinder system does not'
+                    + ' publish the mech action tables on CONFIG.SFRPG, so the mech Actions tab'
+                    + ' stays empty. The rest of the HUD is unaffected.'
+                );
+                return;
+            }
+
             const currentPP = this.actor.system?.attributes?.pp?.value ?? 0;
 
-            const ppActions = (CONFIG.SFRPG.mechPPActions ?? []).map((action, index) => ({
+            const ppActions = mechPPActions.map((action, index) => ({
                 id: `mech-pp-${index}`,
                 name: Utils.i18n(action.name),
                 listName: `Action: ${Utils.i18n(action.name)}`,
@@ -376,11 +418,11 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
             }));
             this.addActions(ppActions, { id: GROUP.mechPPActions.id });
 
-            const specialActions = (CONFIG.SFRPG.mechSpecialActions ?? []).map((action, index) => ({
+            const specialActions = mechSpecialActions.map((action, index) => ({
                 id: `mech-special-${index}`,
                 name: Utils.i18n(action.name),
                 listName: `Action: ${Utils.i18n(action.name)}`,
-                info1: { text: Utils.i18n(CONFIG.SFRPG.mechActionTypes[action.actionType]) },
+                info1: { text: actionTypeLabel(mechActionTypes, action.actionType) },
                 system: {
                     actionType: ACTION_TYPE.mechAction,
                     actionId: `special-${index}`,
@@ -398,10 +440,9 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                     if (!action.name) continue;
 
                     const hasPPCost = action.ppCost !== null && action.ppCost !== undefined;
-                    const typeKey = CONFIG.SFRPG.mechActionTypes[action.actionType];
                     const label = hasPPCost
                         ? `${action.ppCost} PP`
-                        : Utils.i18n(typeKey ?? 'SFRPG.MechSheet.Actions.ActionTypes.Constant');
+                        : actionTypeLabel(mechActionTypes, action.actionType);
 
                     gearActions.push({
                         id: `mech-gear-${item.id}-${index}`,
@@ -508,6 +549,33 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
 
 function byName(a, b) {
     return a.name.localeCompare(b.name);
+}
+
+/**
+ * Keys already notified about this session.
+ *
+ * The HUD rebuilds on twenty-odd Foundry hooks, so a condition that holds for a
+ * whole session would otherwise raise the same notification on every rebuild.
+ */
+const notified = new Set();
+
+function notifyOnce(key, message) {
+    if (notified.has(key)) return;
+    notified.add(key);
+    console.warn(message);
+    ui.notifications.warn(message, { permanent: false });
+}
+
+/**
+ * Label for a mech action's action type.
+ *
+ * An action with no type is constant rather than something spent on a turn, and
+ * the mech sheet labels it that way, so an unrecognised type reads as constant
+ * instead of leaving the badge blank.
+ */
+function actionTypeLabel(actionTypes, actionType) {
+    const key = actionTypes?.[actionType] ?? 'SFRPG.MechSheet.Actions.ActionTypes.Constant';
+    return game.i18n.localize(key);
 }
 
 function signed(value) {

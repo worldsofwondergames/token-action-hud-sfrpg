@@ -70,6 +70,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                     return this.#mechAction(actor);
 
                 case ACTION_TYPE.cancelOverride:
+                    if (!this.#supports(actor, 'cancelMechDamageOverride')) return;
                     await actor.cancelMechDamageOverride();
                     return Hooks.callAll('forceUpdateTokenActionHud');
 
@@ -134,6 +135,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                 console.warn(`${MODULE.ID}: mission pod ${itemId} not found on ${actor.name}`);
                 return;
             }
+            if (!this.#supports(actor, 'setMissionPodActive')) return;
 
             const changed = await actor.setMissionPodActive(pod.id, !pod.system.isActive);
             if (changed) Hooks.callAll('forceUpdateTokenActionHud');
@@ -146,6 +148,8 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
          * @private
          */
         async #mechAction(actor) {
+            if (!this.#supports(actor, 'useMechAction')) return;
+
             const { category, index, itemId, itemActionIndex } = this.action.system;
 
             await actor.useMechAction(category, index, { itemId, itemActionIndex });
@@ -153,6 +157,27 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
             // Spending PP or arming an override changes what the Actions and
             // Utility tabs should offer.
             Hooks.callAll('forceUpdateTokenActionHud');
+        }
+
+        /**
+         * Whether the actor exposes a mech entry point this module needs.
+         *
+         * The mech actions are performed by the Starfinder system, not here.
+         * Older versions keep that work inside the mech sheet where a module
+         * cannot reach it, and the useful thing to do then is say so rather than
+         * throw an opaque TypeError from a button press.
+         *
+         * @private
+         */
+        #supports(actor, method) {
+            if (typeof actor[method] === 'function') return true;
+
+            ui.notifications.warn(
+                `Token Action HUD Starfinder needs ActorSFRPG#${method}(), which this version of`
+                + ' the Starfinder system does not provide. Update the Starfinder system to use'
+                + ' the mech actions.'
+            );
+            return false;
         }
 
         /** @private */
