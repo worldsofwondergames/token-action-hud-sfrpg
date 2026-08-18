@@ -1,0 +1,60 @@
+/*
+ * Targeting is by data-nest-id, which Token Action HUD Core puts on every
+ * subgroup element, so these rules cannot leak into the other lists.
+ */
+
+/*
+ * Abilities and saves are short fixed lists of equal-weight buttons -- six and
+ * three -- so they read as a grid rather than a ragged row. Core sizes action
+ * buttons to their content, which would otherwise make STR and CHA different
+ * widths.
+ */
+#token-action-hud-app [data-nest-id^="abilities_"] .tah-actions,
+#token-action-hud-app [data-nest-id^="saves_"] .tah-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px;
+}
+
+/*
+ * Skill names are far longer than ability abbreviations, so the column count
+ * adapts rather than being pinned -- three fixed columns would squeeze
+ * "Physical Science" unreadably on a narrow HUD.
+ */
+#token-action-hud-app [data-nest-id^="skills_"] .tah-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 2px;
+}
+
+#token-action-hud-app [data-nest-id^="abilities_"] .tah-action,
+#token-action-hud-app [data-nest-id^="saves_"] .tah-action,
+#token-action-hud-app [data-nest-id^="skills_"] .tah-action {
+    width: 100%;
+}
+
+#token-action-hud-app [data-nest-id^="abilities_"] .tah-action-button,
+#token-action-hud-app [data-nest-id^="saves_"] .tah-action-button,
+#token-action-hud-app [data-nest-id^="skills_"] .tah-action-button {
+    width: 100%;
+    min-width: 0;
+}
+
+/*
+ * A Power Point action the mech cannot currently pay for is dimmed. Clicking it
+ * still reaches the actor, which raises the system's own "not enough Power
+ * Points" warning -- the dimming says so a click earlier.
+ */
+#token-action-hud-app [data-nest-id^="mechActions_"] .tah-action-button.disabled {
+    opacity: 0.55;
+}
+
+/*
+ * An active mission pod is the one currently rewriting the mech's loadout, and
+ * its button is the one that would undo that. Mark it so it does not read as
+ * just another item in the list.
+ */
+#token-action-hud-app .tah-action-button.toggle.active {
+    font-weight: bold;
+    box-shadow: inset 0 0 0 1px var(--tah-border-primary, rgba(255, 255, 255, 0.35));
+}

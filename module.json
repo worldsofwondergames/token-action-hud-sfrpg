@@ -1,0 +1,54 @@
+{
+    "id": "token-action-hud-sfrpg",
+    "title": "Token Action HUD Starfinder",
+    "description": "Token Action HUD system module for the Starfinder (sfrpg) system. Adds a repositionable HUD of ability, save, skill, weapon, spell and mech actions for the selected token.",
+    "version": "0.1.0",
+    "compatibility": {
+        "minimum": "14",
+        "verified": "14.363"
+    },
+    "esmodules": [
+        "scripts/init.js"
+    ],
+    "styles": [
+        "styles/token-action-hud-sfrpg.css"
+    ],
+    "languages": [
+        {
+            "lang": "en",
+            "name": "English",
+            "path": "languages/en.json"
+        }
+    ],
+    "relationships": {
+        "systems": [
+            {
+                "id": "sfrpg",
+                "type": "system",
+                "compatibility": {
+                    "minimum": "14.1.0",
+                    "verified": "14.1.0"
+                }
+            }
+        ],
+        "requires": [
+            {
+                "id": "token-action-hud-core",
+                "type": "module",
+                "compatibility": {
+                    "minimum": "2.1",
+                    "verified": "2.1.1"
+                }
+            }
+        ]
+    },
+    "authors": [
+        {
+            "name": "worldsofwondergames",
+            "url": "https://github.com/worldsofwondergames"
+        }
+    ],
+    "url": "https://github.com/worldsofwondergames/token-action-hud-sfrpg",
+    "manifest": "https://raw.githubusercontent.com/worldsofwondergames/token-action-hud-sfrpg/main/module.json",
+    "download": "https://github.com/worldsofwondergames/token-action-hud-sfrpg/archive/refs/heads/main.zip"
+}

@@ -1,0 +1,53 @@
+{
+    "tokenActionHud": {
+        "sfrpg": {
+            "abilities": "Abilities",
+            "saves": "Saves",
+            "skills": "Skills",
+            "attack": "Attack",
+            "weaponAttacks": "Attack",
+            "weaponDamage": "Damage",
+            "inventory": "Inventory",
+            "consumables": "Consumables",
+            "equipment": "Equipment",
+            "otherItems": "Other Items",
+            "spells": "Spells",
+            "spellLevel0": "Cantrips",
+            "spellLevel1": "1st Level",
+            "spellLevel2": "2nd Level",
+            "spellLevel3": "3rd Level",
+            "spellLevel4": "4th Level",
+            "spellLevel5": "5th Level",
+            "spellLevel6": "6th Level",
+            "feats": "Feats",
+            "mechWeapons": "Weapons",
+            "mechSystems": "Systems",
+            "mechActions": "Actions",
+            "mechAuxiliary": "Auxiliary Systems",
+            "mechMissionPods": "Mission Pods",
+            "mechUpgrades": "Upgrades",
+            "mechChassis": "Chassis",
+            "mechPPActions": "Power Point",
+            "mechSpecialActions": "Special",
+            "mechGearActions": "Gear",
+            "utility": "Utility",
+            "rollInitiative": "Roll Initiative",
+            "endTurn": "End Turn",
+            "shortRest": "Short Rest",
+            "longRest": "Long Rest",
+            "activatePod": "Activate {pod}",
+            "deactivatePod": "Deactivate {pod}",
+            "cancelOverride": "Cancel {source}",
+            "settings": {
+                "showUntrainedSkills": {
+                    "name": "Show untrained skills",
+                    "hint": "Display every skill, not only those with ranks. A Starfinder character carries all twenty skills whether or not they are trained."
+                },
+                "showUnequippedItems": {
+                    "name": "Show unequipped items",
+                    "hint": "Display equippable items that are not currently equipped. Consumables and other items that cannot be equipped are always shown."
+                }
+            }
+        }
+    }
+}

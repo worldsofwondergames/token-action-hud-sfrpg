@@ -1,0 +1,13 @@
+{
+    "name": "token-action-hud-sfrpg",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Token Action HUD system module for the Starfinder system for Foundry VTT",
+    "type": "module",
+    "scripts": {
+        "test:e2e": "playwright test --config=playwright.config.mjs"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.49.0"
+    }
+}

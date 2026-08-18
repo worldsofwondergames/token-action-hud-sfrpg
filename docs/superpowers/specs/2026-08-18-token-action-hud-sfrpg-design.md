@@ -1,7 +1,7 @@
 # Token Action HUD Starfinder — Design
 
 Date: 2026-08-18
-Status: Approved, not yet implemented
+Status: Implemented
 
 ## Purpose
 
@@ -83,7 +83,7 @@ the contract again; pinning to the minor makes that break loud.
 | Abilities | Abilities | `system.abilities`, keys from `CONFIG.SFRPG.abilities` | `actor.rollAbility(id)` |
 | Saves | Saves | `system.attributes.{fort,reflex,will}`, keys from `CONFIG.SFRPG.saves` | `actor.rollSave(id)` |
 | Skills | Skills | `system.skills` | `actor.rollSkill(id)` |
-| Attack | Weapons | `weapon` items | `item.rollAttack()` and `item.rollDamage()` |
+| Attack | Attack, Damage | `weapon` items | `item.rollAttack()` and `item.rollDamage()` |
 | Inventory | Consumables, Equipment, Other | `consumable`, `equipment`, `technological`, `hybrid`, `magic`, `shield`, `goods`, `container` items | `item.useItem()`, or `item.rollFormula()` where there is no usage |
 | Spells | one group per level, 0–6 | `spell` items grouped by `system.level` | `actor.useSpell(item)` |
 | Feats | Feats | `feat` items | `item.roll()` |
@@ -98,12 +98,16 @@ Details that follow from the system's own data rather than from choices made her
   than `rollSkillCheck()`.
 - **Weapons.** Attack and damage are two separate actions rather than one action
   that does both, matching the two buttons on the sheet. `item.hasAttack` and
-  `item.hasDamage` decide which of the two exist for a given weapon.
+  `item.hasDamage` decide which of the two exist for a given weapon. They sit in
+  two groups -- every weapon's attack in one, every weapon's damage in the other
+  -- rather than a submenu per weapon, so attacking stays one click.
 - **Spells.** `actor.useSpell(item)` raises the spell-slot dialog, which is where
   slot availability is decided. The HUD does not pre-judge it: a spell with no
   slots left at its own level is still listed, because the system permits casting
-  from a higher slot. The action name carries the remaining slot count for the
-  level so the state is visible without clicking.
+  from a higher slot. The remaining slots are shown on the level's own group
+  heading, through Core's `info1` field, rather than on each spell -- the number
+  is a property of the level, and repeating it on every spell in the level says
+  the same thing many times.
 
 ### Settings
 
@@ -119,15 +123,16 @@ Both call Core's `onChangeFunction` to rebuild the HUD.
 
 | Tab | Group(s) | Source | Entry point |
 |-----|----------|--------|-------------|
-| Weapons | Weapons | `mechWeapon` items | `item.rollAttack()` / `item.rollDamage()` |
-| Systems | Auxiliary, Mission Pods, Upgrades, Frame | `mechAuxiliary`, `mechMissionPod`, `mechUpgrade`, `mechPowerCore`, `mechUpperLimb`, `mechLowerLimb` items | see below |
+| Weapons | Attack, Damage | `mechWeapon` items | `item.rollAttack()` / `item.rollDamage()` |
+| Systems | Auxiliary Systems, Mission Pods, Upgrades, Chassis | `mechAuxiliary`, `mechMissionPod`, `mechUpgrade`, `mechPowerCore`, `mechUpperLimb`, `mechLowerLimb` items | see below |
 | Actions | Power Point, Special, Gear | hardcoded lists + `item.system.actions[]` | `actor.useMechAction(...)`, new — see below |
 | Utility | Utility | — | initiative, end turn, cancel armed damage override |
 
 - **Weapons** need no new plumbing. `ItemSFRPG.rollAttack()` already routes
   `mechWeapon` to `_rollMechAttack()` and `rollDamage()` to `_rollMechDamage()`.
 - **Mission pods** are activated and deactivated rather than rolled; the action
-  toggles, and its label reflects current state.
+  toggles, and its label reflects current state. Like the Power Point actions,
+  this was a sheet handler with no way in from a module -- see below.
 - **Gear actions** come from `item.system.actions[]` on mech gear items and are
   reachable from a module already.
 - **Power Point and Special actions** are not reachable. See below.
@@ -146,17 +151,28 @@ mech has enough PP, warns and aborts if not, deducts the cost, arms the
 `mech-action-card.hbs` chat card. Duplicating the arrays in this module would
 mean duplicating all of that too, and the two copies would drift.
 
-`_onCancelOverride()` at `src/module/actor/sheet/mech.js:592` has the same problem
-for the same reason: it unsets the `sfrpg.damageLevelOverride` flag and refunds
-the PP that armed it, and a module has no way in.
+`_onCancelOverride()` has the same problem for the same reason: it unsets the
+`sfrpg.damageLevelOverride` flag and refunds the PP that armed it, and a module
+has no way in.
 
-**The change:** move the bodies of both handlers onto the mech actor as
-`ActorSFRPG#useMechAction(category, index, { itemId, itemActionIndex })` and
-`ActorSFRPG#cancelMechDamageOverride()`, with the two action tables published on
-`CONFIG.SFRPG` as `mechPPActions` and `mechSpecialActions`. Each sheet handler
-becomes a thin call into its actor method. No behaviour changes; the sheet does
-what it did before and the module gets entry points that produce identical
-results.
+`_onMissionPodActivate()` and `_onMissionPodDeactivate()` are a third case, found
+while building the Systems tab rather than while writing this design. Activating
+a pod creates its item templates on the mech and records their ids; deactivating
+deletes them again. Both bodies were sheet handlers, so nothing outside the sheet
+could change a pod's state.
+
+**The change:** move the bodies of these handlers onto the mech actor as
+`ActorSFRPG#useMechAction(category, index, { itemId, itemActionIndex })`,
+`ActorSFRPG#cancelMechDamageOverride()` and
+`ActorSFRPG#setMissionPodActive(podId, active, { confirm })`, with the action
+tables published on `CONFIG.SFRPG` as `mechPPActions`, `mechSpecialActions` and
+`mechActionTypes`. Each sheet handler becomes a thin call into its actor method.
+No behaviour changes; the sheet does what it did before and the module gets entry
+points that produce identical results.
+
+The Power Point and Special tables were written out twice inside the sheet -- once
+in `_prepareItems()` to render the buttons and again in `_onMechAction()` to
+execute them -- so publishing them removes that duplication as well.
 
 This mirrors megs#156, where the MEGS system had to expose its roll classes on
 `game.megs` before its HUD module could reuse them.
@@ -209,7 +225,7 @@ confirm it fails for the right reason, revert.
 |-------|------|------------|
 | 0 | Scaffold: `module.json`, constants, defaults, system manager, empty handlers. Module registers with Core and shows empty tabs | — |
 | 1 | Character tabs and roll dispatch | 0 |
-| 2 | `sfrpg`: extract `_onMechAction()` and `_onCancelOverride()` onto `ActorSFRPG`, publish the action tables on `CONFIG.SFRPG` | — |
+| 2 | `sfrpg`: extract `_onMechAction()`, `_onCancelOverride()` and the mission pod handlers onto `ActorSFRPG`, publish the action tables on `CONFIG.SFRPG` | — |
 | 3 | Mech tabs and roll dispatch | 0, 2 |
 | 4 | Playwright suite | 1, 3 |
 
@@ -220,9 +236,9 @@ Phase 2 is in the `foundryvtt-starfinder` repo. Phases 0, 1, 3 and 4 are here.
 `nzlbob/token-action-hud-sfrpg` exists on GitHub: a stub, last pushed
 2026-06-11, with an empty stylesheet, an empty `lang/` directory, an 814-byte
 script, and no licence. It is not a working module, but it claims the obvious
-repo name and declares module id `token-action-hud-sfrpg`. Check the Foundry
-package registry for that id before the first release; if it is taken, this
-module ships as `token-action-hud-starfinder`.
+repo name and declares module id `token-action-hud-sfrpg`. The Foundry package
+registry has no entry for either `token-action-hud-sfrpg` or
+`token-action-hud-starfinder`, so the id is free and this module uses it.
 
 Token Action HUD Classic carried built-in `sfrpg` support and is worth reading
 for how it grouped Starfinder actions, though it predates the Core 2.x contract
