@@ -40,7 +40,10 @@ test('Skills tab lists the actor\'s trained skills, and the setting adds the res
 
         actorId = await createCharacter(page, prefixName('SkillChar'), {
             abilities: { dex: 16, int: 14 },
-            skills: { acr: 3, com: 2 }
+            // Athletics has no ranks, so the setting has an untrained skill to add.
+            // A character made through the API carries only the skills it is given.
+            skills: { acr: 3, com: 2, ath: 0 },
+            classLevel: 3
         });
         scene = await buildScene(page, [actorId]);
         await selectToken(page, actorId);
@@ -148,9 +151,14 @@ test('Clicking an ability, a save and an attack each produces a roll', async ({ 
         const fortLabel = await page.evaluate(() => game.i18n.localize(CONFIG.SFRPG.saves.fort));
         const rifleName = prefixName('Rifle');
 
-        for (const label of ['STR', fortLabel, rifleName]) {
+        const clicks = [
+            ['STR', 'abilities_abilities'],
+            [fortLabel, 'saves_saves'],
+            [rifleName, 'attack_weaponAttacks']
+        ];
+        for (const [label, group] of clicks) {
             const before = await chatMessageCount(page);
-            await clickAction(page, label);
+            await clickAction(page, label, { group });
             const message = await waitForChatMessage(page, before);
             expect(message.rollCount).toBeGreaterThan(0);
         }

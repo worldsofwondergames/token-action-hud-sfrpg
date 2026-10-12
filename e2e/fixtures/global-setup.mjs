@@ -3,26 +3,33 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 const AUTH_FILE = './e2e/.auth/state.json';
-const WORLD_TITLE = 'Starfinder Test World';
+// The world and GM account the suite logs in with. Override them to run against
+// another world, e.g. E2E_WORLD="Starfinder: Mechageddon" E2E_USER="Game Master".
+const WORLD_TITLE = process.env.E2E_WORLD ?? 'Starfinder Test World';
+const USER_NAME = process.env.E2E_USER ?? 'Gamemaster';
 const STATUS_URL = 'http://localhost:30000/api/status';
 
 /**
- * Wait until Foundry reports the world is up and nobody is connected.
+ * Wait until Foundry reports the world is up with no more than `maxUsers`
+ * connected.
  *
  * Foundry allows ONE session per user, and it only frees the Gamemaster seat when
  * the socket disconnects -- which happens after browser.close() has already
  * returned. Without this wait the first worker races that release, fails to reach
  * game.ready, and burns its full timeout before retrying. /api/status is served
  * over plain HTTP and takes no seat of its own, so polling it is safe.
+ *
+ * `maxUsers` is the count seen before the suite logged in, so a person already
+ * playing in the world on another account does not block the run.
  */
-async function waitForFreeSeat({ timeoutMs = 30_000, pollMs = 250 } = {}) {
+async function waitForFreeSeat({ maxUsers = 0, timeoutMs = 30_000, pollMs = 250 } = {}) {
     const deadline = Date.now() + timeoutMs;
     let last = null;
     while (Date.now() < deadline) {
         try {
             const res = await fetch(STATUS_URL);
             last = await res.json();
-            if (last.active === true && last.users === 0) return last;
+            if (last.active === true && last.users <= maxUsers) return last;
         } catch (err) {
             last = { error: err.message };
         }
@@ -38,8 +45,10 @@ async function waitForFreeSeat({ timeoutMs = 30_000, pollMs = 250 } = {}) {
 export default async function globalSetup() {
     mkdirSync(dirname(AUTH_FILE), { recursive: true });
 
-    // Nothing may hold the seat before we log in either.
-    await waitForFreeSeat();
+    // Whoever is connected now stays connected; the suite only needs its own
+    // seat back once it is done with it.
+    const status = await fetch(STATUS_URL).then(res => res.json());
+    const maxUsers = status.active === true ? status.users : 0;
 
     const browser = await chromium.launch({ headless: false });
     const context = await browser.newContext();
@@ -55,7 +64,7 @@ export default async function globalSetup() {
     }
 
     await page.waitForSelector('select[name="userid"]', { timeout: 60_000 });
-    await page.locator('select[name="userid"]').selectOption({ label: 'Gamemaster' });
+    await page.locator('select[name="userid"]').selectOption({ label: USER_NAME });
     await page.locator('button:has-text("Join Game Session")').click();
 
     await page.waitForFunction(
@@ -84,5 +93,5 @@ export default async function globalSetup() {
 
     // browser.close() returns before Foundry has processed the disconnect, so
     // hand off to the first worker only once the seat is genuinely free.
-    await waitForFreeSeat();
+    await waitForFreeSeat({ maxUsers });
 }
