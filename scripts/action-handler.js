@@ -6,7 +6,10 @@ import {
     MECH_CHASSIS_TYPES,
     MECH_TYPE,
     MODULE,
-    SPELL_LEVELS
+    NPC_FEATURE_GROUPS,
+    NPC_TYPE,
+    SPELL_LEVELS,
+    SPELL_MODES
 } from './constants.js';
 
 export let ActionHandler = null;
@@ -27,6 +30,11 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                 // Nothing selected, or several tokens: only the actions that do
                 // not belong to one actor make sense.
                 await this.#safely('utility', () => this.#buildCombatActions());
+                return;
+            }
+
+            if (this.actor.type === NPC_TYPE) {
+                await this.#buildNpc();
                 return;
             }
 
@@ -56,8 +64,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                     break;
 
                 default:
-                    // npc2, drone, starship, vehicle and hazard are not supported
-                    // yet. They build an empty HUD rather than an error.
+                    // Drone, starship, vehicle and hazard are not supported yet. They build an empty HUD rather than an error.
                     break;
             }
         }
@@ -133,18 +140,22 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
          * Skills.
          *
          * A Starfinder character carries every skill whether or not it has ranks,
-         * so the default is to show only the trained ones. Professions are
-         * separate entries keyed `pro`, `pro1`, `pro2`... and carry a `subname`,
-         * which is the only thing telling two of them apart.
+         * so the default is to show only the trained ones. An NPC carries every
+         * skill too, and its sheet shows the ones marked `enabled` -- the skills
+         * in its stat block -- so for an NPC that flag decides instead of ranks.
+         * Professions are separate entries keyed `pro`, `pro1`, `pro2`... and
+         * carry a `subname`, which is the only thing telling two of them apart.
          */
         #buildSkills() {
             const skills = this.actor.system?.skills;
             if (!skills) return;
 
             const showUntrained = game.settings.get(MODULE.ID, 'showUntrainedSkills');
+            const isNpc = this.actor.type === NPC_TYPE;
+            const shown = skill => (isNpc ? !!skill.enabled : (skill.ranks ?? 0) > 0);
 
             const actions = Object.entries(skills)
-                .filter(([, skill]) => showUntrained || (skill.ranks ?? 0) > 0)
+                .filter(([, skill]) => showUntrained || shown(skill))
                 .map(([id, skill]) => ({
                     id: `skill-${id}`,
                     name: skillName(id, skill),
@@ -169,7 +180,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
          * @param {object} groups Attack and damage groups to fill
          */
         #buildWeapons(weapons, groups) {
-            const usable = weapons.filter(item => item.type !== 'weapon' || item.system.equipped);
+            const usable = weapons.filter(item => !['weapon', 'shield'].includes(item.type) || item.system.equipped);
 
             const attacks = usable
                 .filter(item => item.hasAttack)
@@ -235,7 +246,9 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         }
 
         /**
-         * Spells, one group per level.
+         * Spells, one group per level, after the Always Available and Innate
+         * groups, which the spellbook lists apart from the levels whatever the
+         * spell's own level. Most monster spell-like abilities are in those two.
          *
          * Slot availability is decided by the spell-slot dialog `useSpell()`
          * raises, not here: the system permits casting a spell from a higher
@@ -249,21 +262,34 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
 
             const contained = containedItemIds(this.actor);
             const slots = this.actor.system?.spells ?? {};
+            const listed = spells.filter(item => !contained.has(item.id));
+            const modeOf = item => item.system.preparation?.mode ?? '';
 
-            for (const level of SPELL_LEVELS) {
-                const group = GROUP[`spells${level}`];
-
-                const actions = spells
-                    .filter(item => (item.system.level ?? 0) === level)
-                    .filter(item => !contained.has(item.id))
-                    .map(item => ({
+            const toActions = list => list
+                .map(item => {
+                    const uses = item.hasUses() ? `${item.getRemainingUses()}/${item.getMaxUses()}` : null;
+                    return {
                         id: `spell-${item.id}`,
                         name: item.name,
                         listName: `Action: ${item.name}`,
                         img: Utils.getImage(item),
+                        ...(uses ? { info1: { text: uses } } : {}),
                         system: { actionType: ACTION_TYPE.spell, actionId: item.id }
-                    }))
-                    .sort(byName);
+                    };
+                })
+                .sort(byName);
+
+            for (const [mode, groupId] of Object.entries(SPELL_MODES)) {
+                const actions = toActions(listed.filter(item => modeOf(item) === mode));
+                if (actions.length) this.addActions(actions, { id: GROUP[groupId].id });
+            }
+
+            for (const level of SPELL_LEVELS) {
+                const group = GROUP[`spells${level}`];
+
+                const actions = toActions(listed
+                    .filter(item => !(modeOf(item) in SPELL_MODES))
+                    .filter(item => (item.system.level ?? 0) === level));
 
                 if (!actions.length) continue;
 
@@ -315,6 +341,83 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
             ];
 
             this.addActions(actions, { id: GROUP.utility.id });
+        }
+
+        /* ---------------------------------------------------------------- */
+        /* NPC                                                              */
+        /* ---------------------------------------------------------------- */
+
+        /**
+         * An NPC gets the character's rolls plus the sheet's own feature split:
+         * Actions for anything with an activation type, then Feats, Class and
+         * Species Features, Universal Creature Rules and Other Features.
+         */
+        async #buildNpc() {
+            await this.#safely('abilities', () => this.#buildAbilities());
+            await this.#safely('saves', () => this.#buildSaves());
+            await this.#safely('skills', () => this.#buildSkills());
+            await this.#safely('attack', () => this.#buildNpcAttacks());
+            await this.#safely('npc actions', () => this.#buildNpcActions());
+            await this.#safely('npc features', () => this.#buildNpcFeatures());
+            await this.#safely('inventory', () => this.#buildInventory());
+            await this.#safely('spells', () => this.#buildSpells());
+            await this.#safely('utility', () => this.#buildCombatActions());
+        }
+
+        /**
+         * Weapons, shields and every feature that makes an attack or deals
+         * damage -- a bite, a breath weapon, a spit attack -- in the Attack and
+         * Damage groups, so a monster's attacks are one click from the HUD
+         * rather than two through the feature's chat card.
+         */
+        #buildNpcAttacks() {
+            this.#buildWeapons(
+                this.actor.items.filter(item => ['weapon', 'shield', 'feat'].includes(item.type)),
+                { attacks: GROUP.weaponAttacks, damage: GROUP.weaponDamage }
+            );
+        }
+
+        /** Features with an activation type, labeled with it and any uses left. */
+        #buildNpcActions() {
+            const activationTypes = CONFIG.SFRPG.abilityActivationTypes ?? {};
+
+            const actions = this.actor.items
+                .filter(item => item.type === 'feat' && item.system.activation?.type)
+                .map(item => {
+                    const action = this.#itemAction(item);
+                    const label = activationTypes[item.system.activation.type];
+                    if (!label) return action;
+
+                    // The uses, when there are any, move to the second badge so
+                    // the action type always reads in the same place.
+                    return {
+                        ...action,
+                        info1: { text: game.i18n.localize(label) },
+                        ...(action.info1 ? { info2: action.info1 } : {})
+                    };
+                })
+                .sort(byName);
+
+            this.addActions(actions, { id: GROUP.npcActions.id });
+        }
+
+        /**
+         * Passive features by category. Archetype and theme features have no
+         * group of their own on the NPC sheet, which lists them under Other
+         * Features, and so does the HUD.
+         */
+        #buildNpcFeatures() {
+            const byGroup = {};
+            for (const item of this.actor.items) {
+                if (item.type !== 'feat' || item.system.activation?.type) continue;
+
+                const groupId = NPC_FEATURE_GROUPS[item.system.details?.category] ?? GROUP.npcOtherFeatures.id;
+                (byGroup[groupId] ??= []).push(this.#itemAction(item));
+            }
+
+            for (const [groupId, actions] of Object.entries(byGroup)) {
+                this.addActions(actions.sort(byName), { id: GROUP[groupId].id });
+            }
         }
 
         /* ---------------------------------------------------------------- */

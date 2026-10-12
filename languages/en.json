@@ -20,6 +20,14 @@
             "spellLevel5": "5th Level",
             "spellLevel6": "6th Level",
             "feats": "Feats",
+            "npcActions": "Actions",
+            "npcFeatures": "Features",
+            "classFeatures": "Class Features",
+            "speciesFeatures": "Species Features",
+            "universalCreatureRules": "Universal Creature Rules",
+            "otherFeatures": "Other Features",
+            "spellsAlways": "Always Available",
+            "spellsInnate": "Innate Spellcasting",
             "mechWeapons": "Weapons",
             "mechSystems": "Systems",
             "mechActions": "Actions",
@@ -41,7 +49,7 @@
             "settings": {
                 "showUntrainedSkills": {
                     "name": "Show untrained skills",
-                    "hint": "Display every skill, not only those with ranks. A Starfinder character carries all twenty skills whether or not they are trained."
+                    "hint": "Display every skill, not only those with ranks, or for an NPC, those in its stat block. Every Starfinder character and NPC carries all twenty skills."
                 },
                 "showUnequippedItems": {
                     "name": "Show unequipped items",

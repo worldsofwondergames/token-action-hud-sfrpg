@@ -23,10 +23,10 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
      * subgroups container and never renders actions directly, so a top-level
      * group with `groups: []` has nowhere to put its actions and shows up empty.
      *
-     * The character tabs and the mech tabs are both here because Core builds one
-     * layout for every actor. A character fills the first eight and a mech the
-     * last three; Core drops the tabs that end up with no actions, so neither
-     * actor sees the other's.
+     * The character, NPC and mech tabs are all here because Core builds one
+     * layout for every actor. Core drops the tabs that end up with no actions,
+     * so no actor type sees another's: only an NPC fills Actions and Features,
+     * only a character fills Feats, and only a mech fills the mech tabs.
      */
     DEFAULTS = {
         layout: [
@@ -39,7 +39,19 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                 groups.equipment,
                 groups.otherItems
             ]),
-            tab('spells', 'tokenActionHud.sfrpg.spells', SPELL_LEVELS.map(level => groups[`spells${level}`])),
+            tab('npcActions', 'tokenActionHud.sfrpg.npcActions', [groups.npcActions]),
+            tab('npcFeatures', 'tokenActionHud.sfrpg.npcFeatures', [
+                groups.npcFeats,
+                groups.npcClassFeatures,
+                groups.npcSpeciesFeatures,
+                groups.npcUniversalCreatureRules,
+                groups.npcOtherFeatures
+            ]),
+            tab('spells', 'tokenActionHud.sfrpg.spells', [
+                groups.spellsAlways,
+                groups.spellsInnate,
+                ...SPELL_LEVELS.map(level => groups[`spells${level}`])
+            ]),
             tab('feats', 'tokenActionHud.sfrpg.feats', [groups.feats]),
             tab('mechWeapons', 'tokenActionHud.sfrpg.mechWeapons', [
                 groups.mechWeaponAttacks,

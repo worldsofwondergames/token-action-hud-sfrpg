@@ -220,14 +220,24 @@ export async function rebuildHud(page) {
  * The match is exact on the button's own text. There is no substring or
  * starts-with fallback: "Attack" is a prefix of several mech action names, and a
  * loose match would press the wrong button and pass.
+ *
+ * A weapon is listed under both Attack and Damage with the same label, so
+ * `group` -- a subgroup nest id such as `attack_weaponAttacks` -- limits the
+ * search to one subgroup. A group that is not rendered is an error.
  */
-export async function clickAction(page, label) {
-    await page.evaluate(({ sel, text }) => {
+export async function clickAction(page, label, { group } = {}) {
+    await page.evaluate(({ sel, text, nest }) => {
         const textOf = el =>
             el.querySelector('.tah-button-text')?.textContent.trim() ?? el.textContent.trim();
 
+        let scope = document.querySelector(sel);
+        if (nest) {
+            scope = scope?.querySelector(`[data-nest-id="${nest}"]`);
+            if (!scope) throw new Error(`No HUD subgroup with nest id "${nest}"`);
+        }
+
         // The bound element is the inner button, not the .tah-action wrapper.
-        const buttons = [...document.querySelectorAll(`${sel} button.tah-action-button`)];
+        const buttons = [...(scope?.querySelectorAll('button.tah-action-button') ?? [])];
         const matches = buttons.filter(b => textOf(b) === text);
 
         if (matches.length !== 1) {
@@ -237,5 +247,5 @@ export async function clickAction(page, label) {
             );
         }
         matches[0].click();
-    }, { sel: HUD_SELECTOR, text: label });
+    }, { sel: HUD_SELECTOR, text: label, nest: group ?? null });
 }

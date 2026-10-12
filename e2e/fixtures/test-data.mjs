@@ -9,9 +9,13 @@ export function prefixName(name) {
  *
  * `abilities.<id>.base` is the stored score; `mod` is derived from it by the
  * rules engine, so tests read `mod` back rather than setting it.
+ *
+ * The rules engine caps a skill's ranks at the character's total class level,
+ * so a character given ranks also needs `classLevel` at least that high, or the
+ * ranks read back as 0.
  */
-export async function createCharacter(page, name, { abilities = {}, skills = {}, spellSlots = {} } = {}) {
-    return page.evaluate(async ({ actorName, abilityScores, skillRanks, slots }) => {
+export async function createCharacter(page, name, { abilities = {}, skills = {}, spellSlots = {}, classLevel = 0 } = {}) {
+    return page.evaluate(async ({ actorName, abilityScores, skillRanks, slots, level }) => {
         const abilityData = {};
         for (const id of Object.keys(CONFIG.SFRPG.abilities)) {
             abilityData[id] = { base: abilityScores[id] ?? 10 };
@@ -36,15 +40,28 @@ export async function createCharacter(page, name, { abilities = {}, skills = {},
                 ...(Object.keys(spellData).length ? { spells: spellData } : {})
             }
         });
+        if (level > 0) {
+            await actor.createEmbeddedDocuments('Item', [{
+                name: '_E2E_Class',
+                type: 'class',
+                system: { levels: level }
+            }]);
+        }
         return actor.id;
-    }, { actorName: name, abilityScores: abilities, skillRanks: skills, slots: spellSlots });
+    }, { actorName: name, abilityScores: abilities, skillRanks: skills, slots: spellSlots, level: classLevel });
 }
 
+/**
+ * A mech whose token is linked to the actor. An unlinked token has its own copy
+ * of the actor, so Power Points spent from the HUD would leave the actor that
+ * the tests read untouched.
+ */
 export async function createMech(page, name, { pp = 5, tier = 1 } = {}) {
     return page.evaluate(async ({ actorName, ppValue, mechTier }) => {
         const actor = await Actor.create({
             name: actorName,
             type: 'mech',
+            prototypeToken: { actorLink: true },
             system: {
                 details: { tier: mechTier },
                 attributes: { pp: { value: ppValue, max: ppValue } }
@@ -82,15 +99,16 @@ export async function addWeapon(page, actorId, { name, equipped = true, damage =
     }, { id: actorId, weaponName: name, isEquipped: equipped, damageFormula: damage });
 }
 
-export async function addSpell(page, actorId, { name, level = 1 } = {}) {
-    return page.evaluate(async ({ id, spellName, spellLevel }) => {
+/** `mode` is the preparation mode: '' for a slotted spell, or 'always' or 'innate'. */
+export async function addSpell(page, actorId, { name, level = 1, mode = '' } = {}) {
+    return page.evaluate(async ({ id, spellName, spellLevel, spellMode }) => {
         const [item] = await game.actors.get(id).createEmbeddedDocuments('Item', [{
             name: spellName,
             type: 'spell',
-            system: { level: spellLevel, preparation: { mode: '' } }
+            system: { level: spellLevel, preparation: { mode: spellMode } }
         }]);
         return item.id;
-    }, { id: actorId, spellName: name, spellLevel: level });
+    }, { id: actorId, spellName: name, spellLevel: level, spellMode: mode });
 }
 
 export async function addMechWeapon(page, actorId, { name, slot = 'frame', damage = '2d6' } = {}) {
@@ -133,4 +151,57 @@ export async function cleanupE2EActors(page) {
             await actor.delete();
         }
     }, TEST_PREFIX);
+}
+
+/**
+ * An NPC. `skills` lists the skills to enable, which is what puts a skill on the
+ * NPC sheet; their values are left to the system.
+ */
+export async function createNpc(page, name, { abilities = {}, skills = [] } = {}) {
+    return page.evaluate(async ({ actorName, abilityScores, enabledSkills }) => {
+        const abilityData = {};
+        for (const [id, base] of Object.entries(abilityScores)) abilityData[id] = { base };
+
+        const skillData = {};
+        for (const id of enabledSkills) skillData[id] = { enabled: true };
+
+        const actor = await Actor.create({
+            name: actorName,
+            type: 'npc2',
+            system: { abilities: abilityData, skills: skillData }
+        });
+        return actor.id;
+    }, { actorName: name, abilityScores: abilities, enabledSkills: skills });
+}
+
+/** A feature, optionally activated or carrying an attack and damage. */
+export async function addFeat(page, actorId, {
+    name,
+    category = 'feat',
+    activation = '',
+    actionType = '',
+    damage = null
+} = {}) {
+    return page.evaluate(async ({ id, featName, featCategory, activationType, featActionType, damageFormula }) => {
+        const [item] = await game.actors.get(id).createEmbeddedDocuments('Item', [{
+            name: featName,
+            type: 'feat',
+            system: {
+                details: { category: featCategory },
+                activation: { type: activationType },
+                actionType: featActionType,
+                ...(damageFormula
+                    ? { damage: { parts: [{ formula: damageFormula, types: { piercing: true }, operator: '' }] } }
+                    : {})
+            }
+        }]);
+        return item.id;
+    }, {
+        id: actorId,
+        featName: name,
+        featCategory: category,
+        activationType: activation,
+        featActionType: actionType,
+        damageFormula: damage
+    });
 }

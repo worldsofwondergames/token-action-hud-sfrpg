@@ -14,6 +14,31 @@ export const CHARACTER_TYPE = 'character';
 export const MECH_TYPE = 'mech';
 
 /**
+ * The NPC actor type. The system's older `npc` type is no longer registered, so
+ * `npc2` is the only one.
+ */
+export const NPC_TYPE = 'npc2';
+
+/**
+ * Spell preparation modes the spellbook lists apart from the spell levels, in
+ * the order it shows them, mapped to their groups. Most monster spell-like
+ * abilities use one of these.
+ */
+export const SPELL_MODES = { always: 'spellsAlways', innate: 'spellsInnate' };
+
+/**
+ * NPC feature groups, keyed by the feat's `details.category`, in the order the
+ * NPC sheet lists them. Feats with an activation type go to Actions instead,
+ * and a category not listed here goes to Other Features, as on the sheet.
+ */
+export const NPC_FEATURE_GROUPS = {
+    feat: 'npcFeats',
+    classFeature: 'npcClassFeatures',
+    speciesFeature: 'npcSpeciesFeatures',
+    universalCreatureRule: 'npcUniversalCreatureRules'
+};
+
+/**
  * Spell levels Starfinder uses. The system's own spellbook keys slots as
  * `system.spells.spell0` through `spell6`, so this is the full range rather
  * than a display choice.
@@ -74,7 +99,19 @@ export const GROUP = {
     mechPPActions: { id: 'mechPPActions', name: 'tokenActionHud.sfrpg.mechPPActions', type: 'system' },
     mechSpecialActions: { id: 'mechSpecialActions', name: 'tokenActionHud.sfrpg.mechSpecialActions', type: 'system' },
     mechGearActions: { id: 'mechGearActions', name: 'tokenActionHud.sfrpg.mechGearActions', type: 'system' },
+    npcActions: { id: 'npcActions', name: 'tokenActionHud.sfrpg.npcActions', type: 'system' },
+    npcFeats: { id: 'npcFeats', name: 'tokenActionHud.sfrpg.feats', type: 'system' },
+    npcClassFeatures: { id: 'npcClassFeatures', name: 'tokenActionHud.sfrpg.classFeatures', type: 'system' },
+    npcSpeciesFeatures: { id: 'npcSpeciesFeatures', name: 'tokenActionHud.sfrpg.speciesFeatures', type: 'system' },
+    npcUniversalCreatureRules: {
+        id: 'npcUniversalCreatureRules',
+        name: 'tokenActionHud.sfrpg.universalCreatureRules',
+        type: 'system'
+    },
+    npcOtherFeatures: { id: 'npcOtherFeatures', name: 'tokenActionHud.sfrpg.otherFeatures', type: 'system' },
     utility: { id: 'utility', name: 'tokenActionHud.sfrpg.utility', type: 'system' },
+    spellsAlways: { id: 'spellsAlways', name: 'tokenActionHud.sfrpg.spellsAlways', type: 'system' },
+    spellsInnate: { id: 'spellsInnate', name: 'tokenActionHud.sfrpg.spellsInnate', type: 'system' },
     ...Object.fromEntries(SPELL_LEVELS.map(level => [
         `spells${level}`,
         { id: `spells${level}`, name: `tokenActionHud.sfrpg.spellLevel${level}`, type: 'system' }
