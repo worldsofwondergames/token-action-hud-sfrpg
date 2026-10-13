@@ -191,6 +191,17 @@ export async function hudActionDisabled(page, label) {
     }, { sel: HUD_SELECTOR, text: label });
 }
 
+/** Whether one action, addressed by its exact label, is shown as switched on. */
+export async function hudActionActive(page, label) {
+    await rebuildHud(page);
+    return page.evaluate(({ sel, text }) => {
+        const button = [...document.querySelectorAll(`${sel} button.tah-action-button`)]
+            .find(b => b.querySelector('.tah-button-text')?.textContent.trim() === text);
+        if (!button) throw new Error(`No HUD action button labelled "${text}"`);
+        return button.classList.contains('active');
+    }, { sel: HUD_SELECTOR, text: label });
+}
+
 /**
  * Rebuild the HUD and wait until it has finished rendering.
  *
