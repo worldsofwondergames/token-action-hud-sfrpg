@@ -35,7 +35,7 @@ export const test = base.extend({
             }
             for (const w of Object.values(ui.windows)) w.close();
         });
-        // Not swallowed: leaked state here is what makes later tests fail in
+        // No catch here: leaked state here is what makes later tests fail in
         // confusing ways, so it should fail the test that caused it.
         await workerPage.waitForFunction(
             () => ![...foundry.applications.instances.values()]

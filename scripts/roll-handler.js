@@ -66,6 +66,13 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                 case ACTION_TYPE.missionPod:
                     return this.#togglePod(actor, actionId);
 
+                case ACTION_TYPE.condition:
+                    // setCondition() fires the system's own hooks, so a condition that
+                    // deals ongoing damage asks for its amount as it does from the token HUD.
+                    if (!this.#supports(actor, 'setCondition')) return;
+                    await actor.setCondition(actionId, !actor.hasCondition(actionId));
+                    return Hooks.callAll('forceUpdateTokenActionHud');
+
                 case ACTION_TYPE.mechAction:
                     return this.#mechAction(actor);
 

@@ -2,7 +2,7 @@
     "id": "token-action-hud-sfrpg",
     "title": "Token Action HUD Starfinder",
     "description": "Token Action HUD system module for the Starfinder (sfrpg) system. Adds a repositionable HUD of ability, save, skill, weapon, spell and mech actions for the selected token.",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "compatibility": {
         "minimum": "14",
         "verified": "14.363"

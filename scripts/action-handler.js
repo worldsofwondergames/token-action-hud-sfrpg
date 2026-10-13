@@ -51,6 +51,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                     await this.#safely('spells', () => this.#buildSpells());
                     await this.#safely('feats', () => this.#buildFeats());
                     await this.#safely('utility', () => this.#buildCharacterUtility());
+                    await this.#safely('conditions', () => this.#buildConditions());
                     break;
 
                 case MECH_TYPE:
@@ -61,6 +62,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                     await this.#safely('mech systems', () => this.#buildMechSystems());
                     await this.#safely('mech actions', () => this.#buildMechActions());
                     await this.#safely('utility', () => this.#buildMechUtility());
+                    await this.#safely('conditions', () => this.#buildConditions());
                     break;
 
                 default:
@@ -323,6 +325,33 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
         }
 
         /** Combat actions plus the two rests. */
+        /**
+         * Every condition the token HUD offers, as toggles. The list is read from
+         * the system's own status effects, so a condition the system adds shows up
+         * here too, and one the token HUD hides (such as Broken) stays hidden.
+         */
+        #buildConditions() {
+            const actor = this.actor;
+            if (typeof actor.hasCondition !== 'function') return;
+
+            const actions = (CONFIG.SFRPG?.statusEffects ?? [])
+                .filter(effect => effect.hud !== false && CONFIG.SFRPG.conditionTypes?.[effect.id])
+                .map(effect => {
+                    const name = Utils.i18n(CONFIG.SFRPG.conditionTypes[effect.id]);
+                    return {
+                        id: effect.id,
+                        name,
+                        listName: `Condition: ${name}`,
+                        img: effect.img,
+                        cssClass: actor.hasCondition(effect.id) ? 'toggle active' : 'toggle',
+                        system: { actionType: ACTION_TYPE.condition, actionId: effect.id }
+                    };
+                })
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            this.addActions(actions, { id: GROUP.conditions.id });
+        }
+
         #buildCharacterUtility() {
             const actions = [
                 ...this.#combatActions(),
@@ -362,6 +391,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
             await this.#safely('inventory', () => this.#buildInventory());
             await this.#safely('spells', () => this.#buildSpells());
             await this.#safely('utility', () => this.#buildCombatActions());
+            await this.#safely('conditions', () => this.#buildConditions());
         }
 
         /**

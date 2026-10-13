@@ -68,6 +68,7 @@ Hooks.once('tokenActionHudCoreApiReady', async (coreModule) => {
                 groups.mechSpecialActions,
                 groups.mechGearActions
             ]),
+            tab('conditions', 'tokenActionHud.sfrpg.conditions', [groups.conditions]),
             tab('utility', 'tokenActionHud.sfrpg.utility', [groups.utility])
         ],
         groups: Object.values(groups)

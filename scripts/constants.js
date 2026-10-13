@@ -77,7 +77,8 @@ export const ACTION_TYPE = {
     initiative: 'initiative',
     endTurn: 'endTurn',
     shortRest: 'shortRest',
-    longRest: 'longRest'
+    longRest: 'longRest',
+    condition: 'condition'
 };
 
 export const GROUP = {
@@ -110,6 +111,7 @@ export const GROUP = {
     },
     npcOtherFeatures: { id: 'npcOtherFeatures', name: 'tokenActionHud.sfrpg.otherFeatures', type: 'system' },
     utility: { id: 'utility', name: 'tokenActionHud.sfrpg.utility', type: 'system' },
+    conditions: { id: 'conditions', name: 'tokenActionHud.sfrpg.conditions', type: 'system' },
     spellsAlways: { id: 'spellsAlways', name: 'tokenActionHud.sfrpg.spellsAlways', type: 'system' },
     spellsInnate: { id: 'spellsInnate', name: 'tokenActionHud.sfrpg.spellsInnate', type: 'system' },
     ...Object.fromEntries(SPELL_LEVELS.map(level => [

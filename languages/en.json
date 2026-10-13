@@ -38,6 +38,7 @@
             "mechPPActions": "Power Point",
             "mechSpecialActions": "Special",
             "mechGearActions": "Gear",
+            "conditions": "Conditions",
             "utility": "Utility",
             "rollInitiative": "Roll Initiative",
             "endTurn": "End Turn",
